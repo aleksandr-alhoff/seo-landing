@@ -10,20 +10,29 @@ DEST="$scratch/project/.agents/skills/seo-landing"
 rsync -a --exclude=.git seo-landing/ "$DEST/"
 test ! -e "$DEST/.git"
 
-# Exercise the documented backup command twice, in the same invocation/day.
-BACKUP=$(mktemp -d "${DEST}.backup-XXXXXXXX") && cp -R "$DEST/." "$BACKUP/" || exit 1
+# Migrate a destination installed with the old cp -R recipe, preserving metadata.
+mkdir "$DEST/.git"
+printf 'legacy-history\n' > "$DEST/.git/history"
+BACKUP_ROOT="$scratch/backups"
+mkdir -p "$BACKUP_ROOT"
+BACKUP=$(mktemp -d "$BACKUP_ROOT/backup-XXXXXXXX") || exit 1
+mkdir "$BACKUP/skill" && rsync -a --exclude=.git "$DEST/" "$BACKUP/skill/" || exit 1
+if [ -d "$DEST/.git" ]; then mv "$DEST/.git" "$BACKUP/git-metadata" || exit 1; fi
 first_backup=$BACKUP
+test ! -e "$DEST/.git"
+test "$(cat "$BACKUP/git-metadata/history")" = legacy-history
 printf 'v2\n' > seo-landing/SKILL.md
 mv seo-landing/removed.md seo-landing/renamed.md
 rsync -a --delete --exclude=.git seo-landing/ "$DEST/"
 test ! -e "$DEST/removed.md"
-BACKUP=$(mktemp -d "${DEST}.backup-XXXXXXXX") && cp -R "$DEST/." "$BACKUP/" || exit 1
+BACKUP=$(mktemp -d "$BACKUP_ROOT/backup-XXXXXXXX") || exit 1
+mkdir "$BACKUP/skill" && rsync -a --exclude=.git "$DEST/" "$BACKUP/skill/" || exit 1
 test "$first_backup" != "$BACKUP"
-test "$(cat "$first_backup/SKILL.md")" = v1
-test "$(cat "$BACKUP/SKILL.md")" = v2
+test "$(cat "$first_backup/skill/SKILL.md")" = v1
+test "$(cat "$BACKUP/skill/SKILL.md")" = v2
 printf 'v3\n' > seo-landing/SKILL.md
 rsync -a --delete --exclude=.git seo-landing/ "$DEST/"
-rsync -a --delete --exclude=.git "$BACKUP/" "$DEST/"
+rsync -a --delete --exclude=.git "$BACKUP/skill/" "$DEST/"
 test "$(cat "$DEST/SKILL.md")" = v2
 test ! -e "$DEST/.git"
 

@@ -253,7 +253,22 @@ Run from the directory that contains the updated `seo-landing/` clone, with `$DE
 DEST=~/.copilot/skills/seo-landing   # ← substitute the right destination
 
 # 1. Recovery first: back up the current installation (the sync is destructive).
-BACKUP=$(mktemp -d "${DEST}.backup-XXXXXXXX") && cp -R "$DEST/." "$BACKUP/" || exit 1
+# Copied installations only: never migrate the source clone or a worktree.
+SOURCE_PATH=$(cd seo-landing && pwd -P) || exit 1
+DEST_PATH=$(cd "$DEST" && pwd -P) || exit 1
+[ "$SOURCE_PATH" != "$DEST_PATH" ] || exit 1
+if [ -L "$DEST/.git" ] || [ -f "$DEST/.git" ]; then
+  printf '%s\n' 'Stop: symlink/worktree Git metadata needs manual migration.' >&2
+  exit 1
+fi
+BACKUP_ROOT="${XDG_STATE_HOME:-$HOME/.local/state}/seo-landing/backups"
+mkdir -p "$BACKUP_ROOT" || exit 1
+# Keep backups outside versioned projects, including per-project skill folders.
+if git -C "$BACKUP_ROOT" rev-parse --show-toplevel >/dev/null 2>&1; then exit 1; fi
+BACKUP=$(mktemp -d "$BACKUP_ROOT/backup-XXXXXXXX") || exit 1
+mkdir "$BACKUP/skill" && rsync -a --exclude=.git "$DEST/" "$BACKUP/skill/" || exit 1
+# Preserve legacy clone metadata separately; never put it back into the skill.
+if [ -d "$DEST/.git" ]; then mv "$DEST/.git" "$BACKUP/git-metadata" || exit 1; fi
 printf 'Backup: %s\n' "$BACKUP"
 
 # 2. Bounded idempotent sync: copy new/changed files AND delete files inside
@@ -262,12 +277,12 @@ rsync -a --delete --exclude=.git seo-landing/ "$DEST/"
 
 # 3. Verify: zero differences (exit status 0) and the installed SKILL.md
 #    matches the source revision byte-for-byte.
-diff -qr -x .git seo-landing "$DEST" && cmp "$DEST/SKILL.md" seo-landing/SKILL.md
+test ! -e "$DEST/.git" && test ! -L "$DEST/.git" && diff -qr -x .git seo-landing "$DEST" && cmp "$DEST/SKILL.md" seo-landing/SKILL.md
 ```
 
 Notes:
 - `rsync -a --delete` is available out of the box on macOS (openrsync) and on typical Linux systems; `--exclude=.git` keeps the clone's history out of the installation.
-- The backup in step 1 is the recovery path: if the new version misbehaves, restore the exact printed backup with `rsync -a --delete --exclude=.git "$BACKUP/" "$DEST/"` after checking both paths. Each run creates a distinct backup, even on the same day; keep `$BACKUP` or its printed path for rollback. (macOS openrsync does not support `--backup`, so the explicit copy is the verified mechanism.)
+- The backup in step 1 is the recovery path: if the new version misbehaves, restore the exact printed backup with `rsync -a --delete --exclude=.git "$BACKUP/skill/" "$DEST/"` after checking both paths. Each run creates a distinct backup, even on the same day; keep `$BACKUP` or its printed path for rollback. Legacy Git metadata is preserved separately in `$BACKUP/git-metadata`, outside the project, and must not be restored into the installed skill.
 - The sync is safe to re-run at any time — running it twice in a row changes nothing the second time.
 - Tested upgrade path: an installation containing a file that the new revision removed loses that file after the sync, and the installed `SKILL.md` becomes byte-identical to the source revision.
 
@@ -289,7 +304,7 @@ Agents read skills when a session starts. After updating, **start a new chat ses
 rm -rf "$DEST"   # the destination from the table above
 ```
 
-If the copy was installed through a client CLI (`openclaw skills install`, `gemini skills install`), prefer that client's own uninstall command when it provides one; otherwise removing the destination directory is sufficient. Also remove any backups (`$DEST.backup-*`) you no longer need.
+If the copy was installed through a client CLI (`openclaw skills install`, `gemini skills install`), prefer that client's own uninstall command when it provides one; otherwise removing the destination directory is sufficient. Also remove any printed backup directories you no longer need.
 
 ### Symlinked installations — optional/experimental
 

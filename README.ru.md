@@ -252,7 +252,22 @@ rsync -a --exclude=.git seo-landing/ .hermes/skills/seo-landing/
 DEST=~/.copilot/skills/seo-landing   # ← подставьте нужное назначение
 
 # 1. Сначала восстановление: сделайте бэкап текущей установки (синхронизация деструктивна).
-BACKUP=$(mktemp -d "${DEST}.backup-XXXXXXXX") && cp -R "$DEST/." "$BACKUP/" || exit 1
+# Copied installations only: never migrate the source clone or a worktree.
+SOURCE_PATH=$(cd seo-landing && pwd -P) || exit 1
+DEST_PATH=$(cd "$DEST" && pwd -P) || exit 1
+[ "$SOURCE_PATH" != "$DEST_PATH" ] || exit 1
+if [ -L "$DEST/.git" ] || [ -f "$DEST/.git" ]; then
+  printf '%s\n' 'Stop: symlink/worktree Git metadata needs manual migration.' >&2
+  exit 1
+fi
+BACKUP_ROOT="${XDG_STATE_HOME:-$HOME/.local/state}/seo-landing/backups"
+mkdir -p "$BACKUP_ROOT" || exit 1
+# Keep backups outside versioned projects, including per-project skill folders.
+if git -C "$BACKUP_ROOT" rev-parse --show-toplevel >/dev/null 2>&1; then exit 1; fi
+BACKUP=$(mktemp -d "$BACKUP_ROOT/backup-XXXXXXXX") || exit 1
+mkdir "$BACKUP/skill" && rsync -a --exclude=.git "$DEST/" "$BACKUP/skill/" || exit 1
+# Preserve legacy clone metadata separately; never put it back into the skill.
+if [ -d "$DEST/.git" ]; then mv "$DEST/.git" "$BACKUP/git-metadata" || exit 1; fi
 printf 'Backup: %s\n' "$BACKUP"
 
 # 2. Ограниченная идемпотентная синхронизация: копирует новые/изменённые файлы
@@ -262,12 +277,12 @@ rsync -a --delete --exclude=.git seo-landing/ "$DEST/"
 
 # 3. Проверка: ноль различий (статус выхода 0), и установленный SKILL.md
 #    побайтово совпадает с исходной ревизией.
-diff -qr -x .git seo-landing "$DEST" && cmp "$DEST/SKILL.md" seo-landing/SKILL.md
+test ! -e "$DEST/.git" && test ! -L "$DEST/.git" && diff -qr -x .git seo-landing "$DEST" && cmp "$DEST/SKILL.md" seo-landing/SKILL.md
 ```
 
 Примечания:
 - `rsync -a --delete` доступен из коробки на macOS (openrsync) и в типичных системах Linux; `--exclude=.git` не пускает историю клона в установку.
-- Бэкап из шага 1 — это путь восстановления: если новая версия ведёт себя плохо, восстановите именно выведенную копию через `rsync -a --delete --exclude=.git "$BACKUP/" "$DEST/"`, предварительно проверив оба пути. Каждый запуск создаёт отдельную копию даже в один день; сохраните `$BACKUP` или выведенный путь для отката. (openrsync на macOS не поддерживает `--backup`, поэтому явное копирование — проверенный механизм.)
+- Бэкап из шага 1 — это путь восстановления: если новая версия ведёт себя плохо, восстановите именно выведенную копию через `rsync -a --delete --exclude=.git "$BACKUP/skill/" "$DEST/"`, предварительно проверив оба пути. Каждый запуск создаёт отдельную копию даже в один день; сохраните `$BACKUP` или выведенный путь для отката. Старые Git-метаданные сохранены отдельно в `$BACKUP/git-metadata`, вне проекта; не возвращайте их внутрь установленного скила.
 - Синхронизацию безопасно перезапускать в любой момент — повторный запуск подряд ничего не меняет.
 - Проверенный путь обновления: установка, содержащая файл, который новая ревизия удалила, теряет этот файл после синхронизации, а установленный `SKILL.md` становится побайтово идентичным исходной ревизии.
 
@@ -289,7 +304,7 @@ diff -qr -x .git seo-landing "$DEST"
 rm -rf "$DEST"   # назначение из таблицы выше
 ```
 
-Если копия была установлена через CLI клиента (`openclaw skills install`, `gemini skills install`), предпочтите собственную команду удаления этого клиента, когда она есть; иначе удаления директории назначения достаточно. Также удалите бэкапы (`$DEST.backup-*`), которые больше не нужны.
+Если копия была установлена через CLI клиента (`openclaw skills install`, `gemini skills install`), предпочтите собственную команду удаления этого клиента, когда она есть; иначе удаления директории назначения достаточно. Также удалите выведенные каталоги бэкапов, которые больше не нужны.
 
 ### Симлинк-установки — опционально/экспериментально
 
