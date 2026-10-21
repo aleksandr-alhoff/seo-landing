@@ -12,6 +12,7 @@
     if (e.key === 'Escape' && nav.classList.contains('open')) {
       nav.classList.remove('open');
       btn.setAttribute('aria-expanded', 'false');
+      btn.setAttribute('aria-label', 'Открыть меню');
       btn.focus();
     }
   });

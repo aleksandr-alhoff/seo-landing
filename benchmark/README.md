@@ -5,6 +5,23 @@ measurements of one concrete before/after comparison. It is NOT field data,
 NOT a Core Web Vitals assessment, and NOT a guarantee of what any other page,
 host, device, or audience will achieve.
 
+## Measurement identity and current fixture
+
+The reports below describe the fixture at commit
+`1aa908f96a09e2e93fd1839ac51b02d362e7a8ef`, not every later revision.
+The current `rebuilt/` example has since been hardened: ordinary stylesheet
+loading compatible with strict CSP, truthful structured data, safe-area
+spacing, and a corrected menu label. Historical reports remain unchanged;
+their scores must not be attributed to the updated fixture without new runs.
+To reproduce the measured bytes, use a separate checkout of that exact commit.
+
+This is a local performance example, not a publish-ready site template.
+It has no cleared asset-rights manifest, brand-approved favicon or production
+hosting/crawler configuration. Do not publish the fixture or its third-party
+assets without obtaining permissions and completing the current skill's
+ASSETS.md, favicon, robots.txt, sitemap.xml and SERVER-SETUP.md contracts.
+No rights clearance or production readiness is implied by committing a fixture.
+
 ## What was compared (the two revisions)
 
 | Side | What it is | Where it lives |

@@ -138,8 +138,10 @@ gzip_types text/html text/css application/javascript application/json image/svg+
 # ORDER MATTERS: Nginx serves the FIRST matching regex location, so the
 # fingerprinted rule must come before the generic asset rule — otherwise
 # every fingerprinted file matches the generic rule and never gets immutable.
-location ~* \.[0-9a-f]{8,}\.(avif|webp|jpg|jpeg|png|css|js)$ {
-  add_header Cache-Control "public, max-age=31536000, immutable" always;
+location ~* "\.[0-9a-f]{8,}\.(avif|webp|jpg|jpeg|png|css|js)$" {
+  try_files $uri =404;
+  # No `always`: missing assets must not receive a year-long cache policy.
+  add_header Cache-Control "public, max-age=31536000, immutable";
   include conf.d/security-headers.conf;
 }
 location ~* \.(avif|webp|jpg|jpeg|png|css|js)$ {
@@ -312,8 +314,7 @@ Header always set Strict-Transport-Security "max-age=300"
 # Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
 ```
 
-Nginx — inside the `listen 443 ssl` server block only (NOT in the port-80
-block):
+Nginx — create a separate `conf.d/hsts-https.conf` file:
 
 ```nginx
 # Phase 1: short trial
@@ -321,6 +322,14 @@ add_header Strict-Transport-Security "max-age=300" always;
 # Phase 2 (after clean rollout):
 # add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
 ```
+
+Include `conf.d/hsts-https.conf` inside the `listen 443 ssl` server block
+AND inside every HTTPS location that declares any `add_header`, including
+each asset, HTML, robots.txt and sitemap.xml location shown above. Nginx does
+not inherit the server's HSTS when a child defines its own headers. Never add
+this include to the shared security-headers file used by HTTP, or to the
+port-80 server. Verify `/`, HTML, an asset and a 404 over HTTPS each carry
+exactly one HSTS header; the HTTP redirect carries none.
 
 Verification:
 ```bash
@@ -446,7 +455,8 @@ So the directory must allow at least:
   AllowOverride FileInfo
 </Directory>
 # or, where the host uses fine-grained lists:
-# AllowOverrideList FileInfo
+# AllowOverride None
+# AllowOverrideList AddOutputFilterByType Header AddType AddCharset AddDefaultCharset
 # or simply: AllowOverride All
 ```
 

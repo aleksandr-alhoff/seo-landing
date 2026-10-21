@@ -93,7 +93,7 @@
 .cta-final h2{margin-bottom:.4em}
 
 /* footer */
-.ftr{background:#101a33;color:#c6d2ef;padding:52px 0 26px;font-size:14.5px}
+.ftr{background:#101a33;color:#c6d2ef;padding:52px 0 max(26px,env(safe-area-inset-bottom));font-size:14.5px}
 .ftr-grid{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:30px;margin-bottom:36px}
 .ftr h3{color:#fff;font-size:16px;margin-bottom:12px}
 .ftr nav a{display:block;padding:3px 0;color:#c6d2ef;border-radius:4px}

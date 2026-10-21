@@ -126,6 +126,10 @@ seo-landing/
 
 ## Установка
 
+Регрессионные проверки репозитория: `python3 -m unittest discover -s tests -v`.
+Для проверки ресурсов нужен Python ≥3.10. Lighthouse 13.4.1 требует Node ≥22.19,
+`npx` и Chrome/Chromium. Отсутствующий инструмент — блокер, а не успешная проверка.
+
 Скил хостится на [github.com/aleksandr-alhoff/seo-landing](https://github.com/aleksandr-alhoff/seo-landing). Склонируйте репозиторий — корень репо и есть папка скила — затем выполните команды ниже из директории, содержащей `seo-landing/`:
 
 ```bash
@@ -136,47 +140,47 @@ git clone https://github.com/aleksandr-alhoff/seo-landing.git
 
 Каждый рецепт ниже самодостаточен: сначала создаёт свою директорию назначения, затем копирует в неё скил. Каждый должен завершаться со статусом `0` и оставлять на месте структуру `<skills-dir>/seo-landing/SKILL.md`.
 
-Примечание: `cp -R` из git-клона также копирует директорию `.git` клона в установку — безвредно, но не нужно. Чтобы установки оставались лёгкими, замените `cp -R seo-landing <dir>/` на `rsync -a --exclude=.git seo-landing <dir>/seo-landing/` (та же синхронизация используется для обновлений ниже).
+Для ручной установки нужен `rsync`. Рецепты исключают `.git` клона: иначе внутри проекта появится вложенный Git-репозиторий, а родительский коммит может сохранить gitlink вместо файлов скила. `.git` должен оставаться только в исходном клоне.
 
 ```bash
 # VS Code Copilot
 mkdir -p ~/.copilot/skills
-cp -R seo-landing ~/.copilot/skills/
+rsync -a --exclude=.git seo-landing/ ~/.copilot/skills/seo-landing/
 
 # Claude Code
 mkdir -p ~/.claude/skills
-cp -R seo-landing ~/.claude/skills/
+rsync -a --exclude=.git seo-landing/ ~/.claude/skills/seo-landing/
 
 # OpenAI Codex CLI / ChatGPT desktop
 mkdir -p ~/.agents/skills
-cp -R seo-landing ~/.agents/skills/
+rsync -a --exclude=.git seo-landing/ ~/.agents/skills/seo-landing/
 
 # Cursor
 mkdir -p ~/.cursor/skills
-cp -R seo-landing ~/.cursor/skills/
+rsync -a --exclude=.git seo-landing/ ~/.cursor/skills/seo-landing/
 
 # Gemini CLI
 mkdir -p ~/.gemini/skills
-cp -R seo-landing ~/.gemini/skills/
+rsync -a --exclude=.git seo-landing/ ~/.gemini/skills/seo-landing/
 
 # Google Antigravity
 mkdir -p ~/.gemini/config/skills
-cp -R seo-landing ~/.gemini/config/skills/
+rsync -a --exclude=.git seo-landing/ ~/.gemini/config/skills/seo-landing/
 
 # OpenCode
 mkdir -p ~/.config/opencode/skills
-cp -R seo-landing ~/.config/opencode/skills/
+rsync -a --exclude=.git seo-landing/ ~/.config/opencode/skills/seo-landing/
 
 # OpenClaw (через CLI — устанавливается в общий ~/.openclaw/skills)
 openclaw skills install git:aleksandr-alhoff/seo-landing --global
 # или из локального клона: openclaw skills install ./seo-landing --global
 # или вручную:
 mkdir -p ~/.openclaw/skills
-cp -R seo-landing ~/.openclaw/skills/
+rsync -a --exclude=.git seo-landing/ ~/.openclaw/skills/seo-landing/
 
 # Hermes
 mkdir -p ~/.hermes/skills
-cp -R seo-landing ~/.hermes/skills/
+rsync -a --exclude=.git seo-landing/ ~/.hermes/skills/seo-landing/
 ```
 
 OpenClaw также подхватывает скилы из `~/.agents/skills` (путь Codex выше), и Hermes тоже может его сканировать, если добавить `~/.agents/skills` в `skills.external_dirs` в `~/.hermes/config.yaml`.
@@ -192,24 +196,24 @@ gemini skills install https://github.com/aleksandr-alhoff/seo-landing.git
 ```bash
 # Общий .agents/skills — подхватывается VS Code Copilot, Codex, Cursor, Antigravity, Gemini CLI, OpenCode, OpenClaw, Hermes
 mkdir -p .agents/skills
-cp -R seo-landing .agents/skills/
+rsync -a --exclude=.git seo-landing/ .agents/skills/seo-landing/
 
 # Claude Code
 mkdir -p .claude/skills
-cp -R seo-landing .claude/skills/
+rsync -a --exclude=.git seo-landing/ .claude/skills/seo-landing/
 
 # VS Code Copilot (локация в стиле GitHub)
 mkdir -p .github/skills
-cp -R seo-landing .github/skills/
+rsync -a --exclude=.git seo-landing/ .github/skills/seo-landing/
 
 # OpenClaw (скилы воркспейса — наивысший приоритет)
 # через CLI: openclaw skills install ./seo-landing
 mkdir -p skills
-cp -R seo-landing skills/
+rsync -a --exclude=.git seo-landing/ skills/seo-landing/
 
 # Hermes (локально для проекта; затем один раз доверьте репо: hermes skills trust)
 mkdir -p .hermes/skills
-cp -R seo-landing .hermes/skills/
+rsync -a --exclude=.git seo-landing/ .hermes/skills/seo-landing/
 ```
 
 ## Обновление, проверка и удаление установленных копий
@@ -248,7 +252,8 @@ cp -R seo-landing .hermes/skills/
 DEST=~/.copilot/skills/seo-landing   # ← подставьте нужное назначение
 
 # 1. Сначала восстановление: сделайте бэкап текущей установки (синхронизация деструктивна).
-cp -R "$DEST" "$DEST.backup-$(date +%Y%m%d)"
+BACKUP=$(mktemp -d "${DEST}.backup-XXXXXXXX") && cp -R "$DEST/." "$BACKUP/" || exit 1
+printf 'Backup: %s\n' "$BACKUP"
 
 # 2. Ограниченная идемпотентная синхронизация: копирует новые/изменённые файлы
 #    И удаляет файлы внутри $DEST, которых больше нет в апстриме.
@@ -262,7 +267,7 @@ diff -qr -x .git seo-landing "$DEST" && cmp "$DEST/SKILL.md" seo-landing/SKILL.m
 
 Примечания:
 - `rsync -a --delete` доступен из коробки на macOS (openrsync) и в типичных системах Linux; `--exclude=.git` не пускает историю клона в установку.
-- Бэкап из шага 1 — это путь восстановления: если новая версия ведёт себя плохо, восстановите её через `rm -rf "$DEST" && cp -R "$DEST.backup-<дата>" "$DEST"`. (openrsync на macOS не поддерживает `--backup`, поэтому явное копирование — проверенный механизм.)
+- Бэкап из шага 1 — это путь восстановления: если новая версия ведёт себя плохо, восстановите именно выведенную копию через `rsync -a --delete --exclude=.git "$BACKUP/" "$DEST/"`, предварительно проверив оба пути. Каждый запуск создаёт отдельную копию даже в один день; сохраните `$BACKUP` или выведенный путь для отката. (openrsync на macOS не поддерживает `--backup`, поэтому явное копирование — проверенный механизм.)
 - Синхронизацию безопасно перезапускать в любой момент — повторный запуск подряд ничего не меняет.
 - Проверенный путь обновления: установка, содержащая файл, который новая ревизия удалила, теряет этот файл после синхронизации, а установленный `SKILL.md` становится побайтово идентичным исходной ревизии.
 

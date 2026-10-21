@@ -1,0 +1,5 @@
+{
+  "private": true,
+  "scripts": { "test": "node browser-regressions.cjs" },
+  "devDependencies": { "playwright": "1.62.1" }
+}

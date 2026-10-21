@@ -83,6 +83,7 @@ Format — [Agent Skills](https://agentskills.io) (open standard originally deve
 ```
 seo-landing/
 ├── SKILL.md              # Main workflow: mode routing → brief → generation → stop point → validation → report
+├── scripts/validate_assets.py # Offline same-origin HTML/CSS resource check (Python ≥3.10)
 ├── references/
 │   ├── tech-spec.md      # Technical spec (13 requirement sections + executable validation contract)
 │   ├── server-config.md  # Server config: caching, Brotli/gzip, security headers (Nginx/Apache)
@@ -126,6 +127,10 @@ These are **lab** numbers for one before/after pair. They are not field Core Web
 
 ## Installation
 
+Repository regression checks: `python3 -m unittest discover -s tests -v`.
+The asset checker needs Python ≥3.10. Lighthouse 13.4.1 needs Node ≥22.19,
+`npx`, and Chrome/Chromium. Missing tools are blockers, never passing checks.
+
 The skill is hosted at [github.com/aleksandr-alhoff/seo-landing](https://github.com/aleksandr-alhoff/seo-landing). Clone the repository — the repo root is the skill folder itself — then run the commands below from the directory that contains `seo-landing/`:
 
 ```bash
@@ -136,47 +141,47 @@ git clone https://github.com/aleksandr-alhoff/seo-landing.git
 
 Every recipe below is self-contained: it creates its destination directory first, then copies the skill into it. Each one must exit with status `0` and leave the layout `<skills-dir>/seo-landing/SKILL.md` in place.
 
-Note: `cp -R` from a git clone also copies the clone's `.git` directory into the installation — harmless, but unnecessary. To keep installations lean, replace `cp -R seo-landing <dir>/` with `rsync -a --exclude=.git seo-landing <dir>/seo-landing/` (the same sync used for updates below).
+Manual installation needs `rsync`. The recipes exclude the clone's `.git`: copying it into another repository creates an embedded Git repository, so a parent commit may record a gitlink instead of the skill files. Only the source clone should retain its `.git`.
 
 ```bash
 # VS Code Copilot
 mkdir -p ~/.copilot/skills
-cp -R seo-landing ~/.copilot/skills/
+rsync -a --exclude=.git seo-landing/ ~/.copilot/skills/seo-landing/
 
 # Claude Code
 mkdir -p ~/.claude/skills
-cp -R seo-landing ~/.claude/skills/
+rsync -a --exclude=.git seo-landing/ ~/.claude/skills/seo-landing/
 
 # OpenAI Codex CLI / ChatGPT desktop
 mkdir -p ~/.agents/skills
-cp -R seo-landing ~/.agents/skills/
+rsync -a --exclude=.git seo-landing/ ~/.agents/skills/seo-landing/
 
 # Cursor
 mkdir -p ~/.cursor/skills
-cp -R seo-landing ~/.cursor/skills/
+rsync -a --exclude=.git seo-landing/ ~/.cursor/skills/seo-landing/
 
 # Gemini CLI
 mkdir -p ~/.gemini/skills
-cp -R seo-landing ~/.gemini/skills/
+rsync -a --exclude=.git seo-landing/ ~/.gemini/skills/seo-landing/
 
 # Google Antigravity
 mkdir -p ~/.gemini/config/skills
-cp -R seo-landing ~/.gemini/config/skills/
+rsync -a --exclude=.git seo-landing/ ~/.gemini/config/skills/seo-landing/
 
 # OpenCode
 mkdir -p ~/.config/opencode/skills
-cp -R seo-landing ~/.config/opencode/skills/
+rsync -a --exclude=.git seo-landing/ ~/.config/opencode/skills/seo-landing/
 
 # OpenClaw (via CLI — installs into the shared ~/.openclaw/skills)
 openclaw skills install git:aleksandr-alhoff/seo-landing --global
 # or from a local clone: openclaw skills install ./seo-landing --global
 # or manually:
 mkdir -p ~/.openclaw/skills
-cp -R seo-landing ~/.openclaw/skills/
+rsync -a --exclude=.git seo-landing/ ~/.openclaw/skills/seo-landing/
 
 # Hermes
 mkdir -p ~/.hermes/skills
-cp -R seo-landing ~/.hermes/skills/
+rsync -a --exclude=.git seo-landing/ ~/.hermes/skills/seo-landing/
 ```
 
 OpenClaw also picks up skills from `~/.agents/skills` (the Codex path above), and Hermes can scan it too if you add `~/.agents/skills` to `skills.external_dirs` in `~/.hermes/config.yaml`.
@@ -192,24 +197,24 @@ gemini skills install https://github.com/aleksandr-alhoff/seo-landing.git
 ```bash
 # Shared .agents/skills — picked up by VS Code Copilot, Codex, Cursor, Antigravity, Gemini CLI, OpenCode, OpenClaw, Hermes
 mkdir -p .agents/skills
-cp -R seo-landing .agents/skills/
+rsync -a --exclude=.git seo-landing/ .agents/skills/seo-landing/
 
 # Claude Code
 mkdir -p .claude/skills
-cp -R seo-landing .claude/skills/
+rsync -a --exclude=.git seo-landing/ .claude/skills/seo-landing/
 
 # VS Code Copilot (GitHub-style location)
 mkdir -p .github/skills
-cp -R seo-landing .github/skills/
+rsync -a --exclude=.git seo-landing/ .github/skills/seo-landing/
 
 # OpenClaw (workspace skills — highest precedence)
 # via CLI: openclaw skills install ./seo-landing
 mkdir -p skills
-cp -R seo-landing skills/
+rsync -a --exclude=.git seo-landing/ skills/seo-landing/
 
 # Hermes (project-local; then trust the repo once: hermes skills trust)
 mkdir -p .hermes/skills
-cp -R seo-landing .hermes/skills/
+rsync -a --exclude=.git seo-landing/ .hermes/skills/seo-landing/
 ```
 
 ## Updating, verifying, and uninstalling installed copies
@@ -248,7 +253,8 @@ Run from the directory that contains the updated `seo-landing/` clone, with `$DE
 DEST=~/.copilot/skills/seo-landing   # ← substitute the right destination
 
 # 1. Recovery first: back up the current installation (the sync is destructive).
-cp -R "$DEST" "$DEST.backup-$(date +%Y%m%d)"
+BACKUP=$(mktemp -d "${DEST}.backup-XXXXXXXX") && cp -R "$DEST/." "$BACKUP/" || exit 1
+printf 'Backup: %s\n' "$BACKUP"
 
 # 2. Bounded idempotent sync: copy new/changed files AND delete files inside
 #    $DEST that no longer exist upstream. --delete only ever touches $DEST.
@@ -261,7 +267,7 @@ diff -qr -x .git seo-landing "$DEST" && cmp "$DEST/SKILL.md" seo-landing/SKILL.m
 
 Notes:
 - `rsync -a --delete` is available out of the box on macOS (openrsync) and on typical Linux systems; `--exclude=.git` keeps the clone's history out of the installation.
-- The backup in step 1 is the recovery path: if the new version misbehaves, restore it with `rm -rf "$DEST" && cp -R "$DEST.backup-<date>" "$DEST"`. (macOS openrsync does not support `--backup`, so the explicit copy is the verified mechanism.)
+- The backup in step 1 is the recovery path: if the new version misbehaves, restore the exact printed backup with `rsync -a --delete --exclude=.git "$BACKUP/" "$DEST/"` after checking both paths. Each run creates a distinct backup, even on the same day; keep `$BACKUP` or its printed path for rollback. (macOS openrsync does not support `--backup`, so the explicit copy is the verified mechanism.)
 - The sync is safe to re-run at any time — running it twice in a row changes nothing the second time.
 - Tested upgrade path: an installation containing a file that the new revision removed loses that file after the sync, and the installed `SKILL.md` becomes byte-identical to the source revision.
 
