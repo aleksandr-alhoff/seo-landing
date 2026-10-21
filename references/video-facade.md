@@ -77,7 +77,7 @@ document.addEventListener('click', function (e) {
   iframe.loading = 'lazy';
   iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
   iframe.allowFullscreen = true;
-  iframe.referrerPolicy = 'no-referrer'; // never leak the landing URL to YouTube
+  iframe.referrerPolicy = 'strict-origin-when-cross-origin'; // origin only; required player identity
   box.innerHTML = '';
   box.appendChild(iframe);
   iframe.focus();
@@ -97,4 +97,4 @@ click handler, so both follow the same network policy: first contact with
 - Before activation (click or Enter/Space): zero requests to YouTube — no preconnect, no DNS, no connection setup; hovering or keyboard-focusing the cover contacts nothing. Verify in DevTools: filter `youtube-nocookie.com`, load the page, hover/focus without activating → zero requests; activate → the embed request appears. After activation the embed still avoids ~0.5–1 MB of JS and dozens of connections that an immediate embed would have caused on page load.
 - CLS = 0: fixed `aspect-ratio: 16/9` and numeric `width/height`.
 - The video ID is untrusted input: it is validated against `^[A-Za-z0-9_-]{11}$` at generation time (tech-spec §13) and again before the iframe URL is built — a malformed ID must fail generation, not reach the DOM.
-- Third-party governance (tech-spec §11): the YouTube embed is a documented dependency — record origin, activation moment (click only), CSP `frame-src`/`connect-src` destination, and subrequests in the per-page manifest. `referrerPolicy="no-referrer"` is set on the iframe so the landing URL is never sent to YouTube. `sandbox` is a documented incompatibility for this embed: YouTube playback requires `allow-scripts` + `allow-same-origin` together, which equals no sandbox — record that justification instead of adding a no-op sandbox. Verify after deployment: playback starts on click, and fullscreen works.
+- Third-party governance (tech-spec §11): the YouTube embed is a documented dependency — record origin, activation moment (click only), CSP `frame-src`/`connect-src` destination, and subrequests in the per-page manifest. Use `strict-origin-when-cross-origin`: YouTube requires HTTP Referer identification for embedded players; suppressing it can cause error 153. Only the origin is sent, without the landing path/query. See [YouTube client identity requirements](https://developers.google.com/youtube/terms/required-minimum-functionality#api-client-identity-and-credentials). `sandbox` is a documented incompatibility for this embed: YouTube playback requires `allow-scripts` + `allow-same-origin` together, which equals no sandbox — record that justification instead of adding a no-op sandbox. Verify after HTTPS deployment: playback starts on click, and fullscreen works; do not claim playback based only on iframe insertion.

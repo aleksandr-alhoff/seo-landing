@@ -1,0 +1,7 @@
+[run]
+branch = True
+include = scripts/validate_assets.py
+
+[report]
+show_missing = True
+fail_under = 74

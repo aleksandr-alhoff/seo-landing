@@ -26,7 +26,7 @@ users know which third party they are about to contact.
 ## CSS
 
 ```css
-.map-facade{position:relative;max-width:1200px}
+.map-facade{position:relative;max-width:1200px;aspect-ratio:1280/480}
 .map-facade img{width:100%;height:auto;display:block}
 .map-facade iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
 .map-open{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
@@ -55,7 +55,7 @@ document.addEventListener('click', function (e) {
   iframe.title = 'Interactive map: business location';
   iframe.loading = 'lazy';
   iframe.allowFullscreen = false;
-  iframe.referrerPolicy = 'no-referrer-when-downgrade';
+  iframe.referrerPolicy = 'strict-origin-when-cross-origin';
   box.innerHTML = '';
   box.appendChild(iframe);
   iframe.focus();
@@ -63,6 +63,10 @@ document.addEventListener('click', function (e) {
 ```
 
 ## Notes
+- Keep the container aspect ratio equal to the screenshot dimensions. It must
+  retain its height when activation removes the image and inserts an absolute
+  iframe. Test nonzero, unchanged geometry after pointer and keyboard activation.
+- Send only the page origin to the HTTPS provider, never its full path/query.
 - The iframe `src` is absent from the initial DOM entirely — the only map
   bytes before activation are the local screenshot. Network test: filter the
   provider domain in DevTools, load the page and scroll past the block — zero
