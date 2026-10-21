@@ -454,11 +454,14 @@ So the directory must allow at least:
 <Directory /var/www/site>
   AllowOverride FileInfo
 </Directory>
-# or, where the host uses fine-grained lists:
-# AllowOverride None
-# AllowOverrideList AddOutputFilterByType Header AddType AddCharset AddDefaultCharset
 # or simply: AllowOverride All
 ```
+
+`AllowOverrideList` takes individual directive names, not override classes.
+Do not substitute `AllowOverrideList FileInfo`. If the host requires a
+fine-grained list, have its administrator enumerate and test every permitted
+directive and container used by the complete file; use the working
+`AllowOverride FileInfo` example above when that class is permitted.
 
 If the host disables overrides entirely, move the same directives into the
 virtual-host/`<Directory>` config instead — the behavioral requirements below

@@ -1,4 +1,7 @@
 """Portable regression checks: python -m unittest discover -s tests -v."""
+import contextlib
+import importlib.util
+import io
 import json
 import re
 import subprocess
@@ -6,17 +9,21 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
+SPEC = importlib.util.spec_from_file_location('validate_assets', ROOT / 'scripts/validate_assets.py')
+CHECKER = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(CHECKER)
 
 
 class AssetValidationTests(unittest.TestCase):
     def check_assets(self, folder):
-        return subprocess.run(
-            [sys.executable, str(ROOT / 'scripts/validate_assets.py'),
-             str(folder), '--page-url', 'https://example.com/'],
-            capture_output=True, text=True, check=False,
-        )
+        output = io.StringIO()
+        with (patch.object(sys, 'argv', ['validate_assets.py', str(folder), '--page-url', 'https://example.com/']),
+              contextlib.redirect_stdout(output)):
+            status = CHECKER.main()
+        return subprocess.CompletedProcess([], status, stdout=output.getvalue(), stderr='')
 
     def test_missing_same_origin_absolute_asset_fails(self):
         with tempfile.TemporaryDirectory() as directory:
