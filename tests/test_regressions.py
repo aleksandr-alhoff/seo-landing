@@ -63,6 +63,26 @@ class AssetValidationTests(unittest.TestCase):
             (root / 'my photo.png').touch()
             self.assertEqual(self.check_assets(root).returncode, 0)
 
+    def test_embedded_documents_and_svg_resource_references_are_checked(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'index.html').write_text(
+                '<iframe src="frame.html"></iframe><embed src="document.pdf">'
+                '<object data="object.html"></object><svg><image href="image.png"/>'
+                '<use href="sprite.svg#icon"/></svg>', encoding='utf-8')
+            result = self.check_assets(root)
+            self.assertEqual(result.returncode, 1)
+            for name in ('frame.html', 'document.pdf', 'object.html', 'image.png', 'sprite.svg'):
+                self.assertIn(name, result.stdout)
+
+    def test_inline_css_import_with_comment_is_checked(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'index.html').write_text('<style>@import/*comment*/"missing.css";</style>', encoding='utf-8')
+            result = self.check_assets(root)
+            self.assertEqual(result.returncode, 1)
+            self.assertIn('missing.css', result.stdout)
+
 
 class ReferenceRegressionTests(unittest.TestCase):
     def test_benchmark_does_not_publish_ineligible_rating_or_breadcrumbs(self):

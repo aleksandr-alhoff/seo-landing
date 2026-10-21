@@ -12,7 +12,7 @@ from pathlib import Path
 from urllib.parse import unquote, urljoin, urlsplit
 
 CSS_URL = re.compile(r'''url\(\s*(?:"([^"]*)"|'([^']*)'|([^\s)]+))\s*\)''', re.IGNORECASE)
-CSS_IMPORT = re.compile(r'@import\s+[\'"]([^\'"]+)[\'"]', re.IGNORECASE)
+CSS_IMPORT = re.compile(r'@import\s*[\'"]([^\'"]+)[\'"]', re.IGNORECASE)
 
 
 def css_urls(css):
@@ -29,8 +29,12 @@ class Resources(HTMLParser):
         attrs = dict(attrs)
         if tag == 'base':
             raise ValueError('<base> is unsupported; resolve/remove it before validation')
-        if tag in ('img', 'source', 'script', 'video', 'audio', 'track', 'input'):
+        if tag in ('img', 'source', 'script', 'video', 'audio', 'track', 'input', 'iframe', 'embed'):
             self.urls.extend(attrs[k] for k in ('src', 'poster') if attrs.get(k))
+        if tag == 'object' and attrs.get('data'):
+            self.urls.append(attrs['data'])
+        if tag in ('image', 'use'):
+            self.urls.extend(attrs[k] for k in ('href', 'xlink:href') if attrs.get(k))
         if (tag == 'link' and attrs.get('href') and set(attrs.get('rel', '').lower().split()) & {
                 'stylesheet', 'preload', 'icon', 'apple-touch-icon', 'modulepreload'}):
             self.urls.append(attrs['href'])
@@ -52,6 +56,7 @@ class Resources(HTMLParser):
 
     def handle_data(self, data):
         if self.in_style:
+            data = re.sub(r'/\*[\s\S]*?\*/', '', data)
             self.urls.extend(css_urls(data))
             self.urls.extend(CSS_IMPORT.findall(data))
 
